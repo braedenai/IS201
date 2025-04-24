@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Challenge</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #2c3e50;
+            font-family: 'Arial', sans-serif;
+            color: #ecf0f1;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            color: #e74c3c;
+        }
+
+        .status-bars {
+            display: flex;
+            justify-content: space-between;
+            width: 400px; /* Same as canvas width */
+            margin-bottom: 10px;
+            padding: 5px;
+            background-color: #34495e;
+            border-radius: 5px;
+        }
+
+        .length-bar-container {
+            width: 48%;
+            background-color: #7f8c8d;
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+            height: 20px;
+            border: 1px solid #95a5a6;
+        }
+
+        .length-bar-fill {
+            height: 100%;
+            background-color: #2ecc71; /* Player */
+            width: 0%; /* Initial width */
+            transition: width 0.3s ease;
+            border-radius: 3px 0 0 3px;
+        }
+
+        #opponent-bar .length-bar-fill {
+            background-color: #f1c40f; /* Opponent */
+        }
+
+        .length-bar-label {
+            position: absolute;
+            top: 0;
+            left: 5px;
+            line-height: 20px;
+            font-size: 12px;
+            color: #1a1a1a;
+            font-weight: bold;
+            z-index: 1;
+        }
+
+
+        canvas {
+            border: 5px solid #e74c3c;
+            background-color: #ecf0f1;
+            display: block; /* Needed to prevent extra space below */
+        }
+
+        .overlay {
+            display: none; /* Hidden by default */
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(44, 62, 80, 0.85); /* Semi-transparent dark background */
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+            z-index: 10; /* Ensure it's above the canvas */
+        }
+
+        .overlay-content {
+             background-color: #34495e;
+             padding: 30px;
+             border-radius: 10px;
+             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .overlay h2 {
+            margin-top: 0;
+            color: #e74c3c;
+        }
+
+         .overlay p {
+            color: #ecf0f1;
+            font-size: 1.1em;
+         }
+
+        .overlay button {
+            padding: 10px 20px;
+            font-size: 1em;
+            color: #fff;
+            background-color: #e74c3c;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: background-color 0.3s ease;
+        }
+
+        .overlay button:hover {
+            background-color: #c0392b;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Snake Challenge!</h1>
+
+    <div class="status-bars">
+        <div id="player-bar" class="length-bar-container">
+             <span class="length-bar-label">You: 1/5</span>
+            <div class="length-bar-fill"></div>
+        </div>
+        <div id="opponent-bar" class="length-bar-container">
+            <span class="length-bar-label">Opponent: 1/5</span>
+            <div class="length-bar-fill"></div>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+    <div id="winScreen" class="overlay">
+        <div class="overlay-content">
+            <h2>Super Snake!</h2>
+            <p>Congrats, you are a super good snake.<br>Now, let's give you a harder opponent!</p>
+            </div>
+    </div>
+
+    <div id="loseScreen" class="overlay">
+         <div class="overlay-content">
+            <h2>Too Slow!</h2>
+            <p>Man, you were too slow. Would you like to try again?</p>
+            <button id="restartButton">Redeem yourself!</button>
+         </div>
+    </div>
+
+    <script>
+        // --- Game Setup ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gridSize = 20; // Size of each square
+        const canvasSize = canvas.width; // Assuming square canvas
+        const tileCount = canvasSize / gridSize; // How many tiles fit on the canvas
+
+        const winScreen = document.getElementById('winScreen');
+        const loseScreen = document.getElementById('loseScreen');
+        const restartButton = document.getElementById('restartButton');
+        const playerBarFill = document.querySelector('#player-bar .length-bar-fill');
+        const playerBarLabel = document.querySelector('#player-bar .length-bar-label');
+        const opponentBarFill = document.querySelector('#opponent-bar .length-bar-fill');
+        const opponentBarLabel = document.querySelector('#opponent-bar .length-bar-label');
+
+
+        // --- Game State ---
+        let playerSnake, opponentSnake;
+        let playerDirection, nextPlayerDirection;
+        let opponentDirection;
+        let food;
+        let playerScore, opponentScore;
+        let isGameOver;
+        let gameLoopTimeout, opponentLoopTimeout;
+        const targetScore = 5;
+        const initialPlayerSpeed = 150; // ms per move (lower is faster)
+        const initialOpponentSpeed = 250; // ms per move (slower initially)
+        let currentOpponentSpeed; // This will decrease after player wins
+
+        // --- Game Initialization ---
+        function initGame(resetOpponentSpeed = true) {
+            console.log("Initializing game...");
+            isGameOver = false;
+            hideOverlays();
+
+            // Reset scores and lengths
+            playerScore = 1;
+            opponentScore = 1;
+            updateLengthBar('player', playerScore);
+            updateLengthBar('opponent', opponentScore);
+
+            // Reset speeds
+            if (resetOpponentSpeed) {
+                currentOpponentSpeed = initialOpponentSpeed;
+            }
+
+            // Initial snake positions (ensure they don't start on top of each other)
+            playerSnake = [{ x: 5, y: Math.floor(tileCount / 2) }];
+            opponentSnake = [{ x: tileCount - 6, y: Math.floor(tileCount / 2) }];
+
+            // Initial directions
+            playerDirection = 'right';
+            nextPlayerDirection = 'right'; // Buffer for next move
+            opponentDirection = 'left';
+
+            placeFood(); // Place initial food item
+
+            // Clear any existing loops before starting new ones
+            clearTimeout(gameLoopTimeout);
+            clearTimeout(opponentLoopTimeout);
+
+            // Start game loops
+            gameLoop();
+            opponentLoop();
+            console.log("Game initialized. Player Speed:", initialPlayerSpeed, "Opponent Speed:", currentOpponentSpeed);
+        }
+
+        // --- Game Loop ---
+        function gameLoop() {
+            if (isGameOver) return;
+
+            playerDirection = nextPlayerDirection; // Update direction safely
+
+            if (moveSnake(playerSnake, playerDirection, 'player')) {
+                // Player moved successfully
+                checkFoodCollision('player');
+                checkWinCondition('player');
+                drawGame();
+            } else {
+                // Player collided with wall or self
+                gameOver(false); // Player loses
+                return; // Stop the loop
+            }
+
+            // Schedule next frame
+             gameLoopTimeout = setTimeout(gameLoop, initialPlayerSpeed);
+        }
+
+        // --- Opponent Loop ---
+        function opponentLoop() {
+             if (isGameOver) return;
+
+            opponentAI(); // Decide opponent's next move
+
+            if (moveSnake(opponentSnake, opponentDirection, 'opponent')) {
+                 // Opponent moved successfully
+                checkFoodCollision('opponent');
+                checkWinCondition('opponent');
+                // No need to draw here, main game loop handles drawing
+            } else {
+                 // Opponent collided - for simplicity, let it just stop or try a random move?
+                 // In this version, opponent hitting wall/self doesn't end the game for the *player*
+                 // Let's make it try a random valid direction if stuck
+                 console.log("Opponent stuck, trying random move");
+                 const validMoves = ['up', 'down', 'left', 'right'].filter(dir => {
+                     const [dx, dy] = getDirectionDelta(dir);
+                     const nextX = opponentSnake[0].x + dx;
+                     const nextY = opponentSnake[0].y + dy;
+                     return !checkCollision(nextX, nextY, opponentSnake) && dir !== getOppositeDirection(opponentDirection);
+                 });
+                 if (validMoves.length > 0) {
+                     opponentDirection = validMoves[Math.floor(Math.random() * validMoves.length)];
+                 }
+                 // If still no valid moves, it's truly stuck (e.g., boxed in)
+            }
+
+            // Schedule next opponent move based on current speed
+            opponentLoopTimeout = setTimeout(opponentLoop, currentOpponentSpeed);
+        }
+
+        // --- Movement Logic ---
+        function moveSnake(snake, direction, snakeType) {
+            const head = { ...snake[0] }; // Copy the head
+            const [dx, dy] = getDirectionDelta(direction);
+
+            head.x += dx;
+            head.y += dy;
+
+            // Check for wall collisions
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                 if (snakeType === 'player') {
+                     console.log("Player hit wall");
+                     return false; // Player collision ends game
+                 } else {
+                     console.log("Opponent hit wall - stopping its move");
+                     return false; // Opponent collision just stops this move
+                 }
+            }
+
+             // Check for self-collision (only for player, opponent AI should prevent this)
+             if (snakeType === 'player' && checkCollision(head.x, head.y, snake)) {
+                  console.log("Player hit self");
+                  return false; // Player collision ends game
+             }
+             // Opponent self-collision is handled by the AI preventing certain moves
+
+            // Add new head
+            snake.unshift(head);
+
+            // Check if snake ate food (handled separately in checkFoodCollision)
+            // If not eating, remove tail
+            // Growth is handled *after* checking food collision
+
+            return true; // Move was successful
+        }
+
+        function getDirectionDelta(direction) {
+             switch (direction) {
+                case 'up': return [0, -1];
+                case 'down': return [0, 1];
+                case 'left': return [-1, 0];
+                case 'right': return [1, 0];
+                default: return [0, 0]; // Should not happen
+            }
+        }
+
+         function getOppositeDirection(direction) {
+            switch (direction) {
+                case 'up': return 'down';
+                case 'down': return 'up';
+                case 'left': return 'right';
+                case 'right': return 'left';
+            }
+        }
+
+
+        // --- Collision Detection ---
+        function checkCollision(x, y, snake) {
+            // Checks if coordinates (x, y) collide with any part of the given snake's body
+            // Start from index 1 because index 0 is the head *before* it's confirmed
+            for (let i = 0; i < snake.length; i++) {
+                if (snake[i].x === x && snake[i].y === y) {
+                    return true; // Collision detected
+                }
+            }
+            return false; // No collision
+        }
+
+        function checkFoodCollision(snakeType) {
+             const snake = (snakeType === 'player') ? playerSnake : opponentSnake;
+             const head = snake[0];
+
+             if (head.x === food.x && head.y === food.y) {
+                 console.log(snakeType, "ate food!");
+                 if (snakeType === 'player') {
+                     playerScore++;
+                     updateLengthBar('player', playerScore);
+                     // Don't pop tail - snake grows
+                 } else {
+                     opponentScore++;
+                     updateLengthBar('opponent', opponentScore);
+                     // Don't pop tail - snake grows
+                 }
+                 placeFood(); // Place new food
+             } else {
+                 // Didn't eat food, remove tail segment
+                 snake.pop();
+             }
+        }
+
+
+        // --- Food Logic ---
+        function placeFood() {
+            let newFoodPosition;
+            let validPosition = false;
+            while (!validPosition) {
+                newFoodPosition = {
+                    x: Math.floor(Math.random() * tileCount),
+                    y: Math.floor(Math.random() * tileCount)
+                };
+                // Ensure food is not placed on ANY part of EITHER snake
+                let collisionWithPlayer = checkCollision(newFoodPosition.x, newFoodPosition.y, playerSnake);
+                let collisionWithOpponent = checkCollision(newFoodPosition.x, newFoodPosition.y, opponentSnake);
+
+                if (!collisionWithPlayer && !collisionWithOpponent) {
+                    validPosition = true;
+                }
+            }
+            food = newFoodPosition;
+            console.log("New food placed at:", food.x, food.y);
+        }
+
+        // --- Opponent AI ---
+        function opponentAI() {
+            const head = opponentSnake[0];
+            const target = food;
+            let bestMove = opponentDirection; // Default to current direction
+
+            // Calculate distance difference
+            const dx = target.x - head.x;
+            const dy = target.y - head.y;
+
+            // Potential moves, prioritizing the direction with the larger distance
+            let potentialMoves = [];
+            if (Math.abs(dx) > Math.abs(dy)) {
+                 if (dx > 0) potentialMoves.push('right');
+                 if (dx < 0) potentialMoves.push('left');
+                 if (dy > 0) potentialMoves.push('down');
+                 if (dy < 0) potentialMoves.push('up');
+            } else {
+                 if (dy > 0) potentialMoves.push('down');
+                 if (dy < 0) potentialMoves.push('up');
+                 if (dx > 0) potentialMoves.push('right');
+                 if (dx < 0) potentialMoves.push('left');
+            }
+             // Add current direction as a fallback if primary targets are blocked
+             if (!potentialMoves.includes(opponentDirection)) {
+                 potentialMoves.push(opponentDirection);
+             }
+
+             // Filter out invalid moves (reverse, wall collision, self collision)
+            const validMoves = potentialMoves.filter(move => {
+                if (move === getOppositeDirection(opponentDirection) && opponentSnake.length > 1) {
+                    return false; // Cannot reverse into self
+                }
+                const [ddx, ddy] = getDirectionDelta(move);
+                const nextX = head.x + ddx;
+                const nextY = head.y + ddy;
+
+                // Check wall collision
+                if (nextX < 0 || nextX >= tileCount || nextY < 0 || nextY >= tileCount) {
+                    return false;
+                }
+                 // Check self collision (excluding tail tip, which will move)
+                 for (let i = 0; i < opponentSnake.length -1; i++) {
+                    if (opponentSnake[i].x === nextX && opponentSnake[i].y === nextY) {
+                        return false;
+                    }
+                 }
+                return true;
+            });
+
+            if (validMoves.length > 0) {
+                 // Choose the first valid move from the prioritized list
+                 bestMove = validMoves[0];
+                 // console.log("Opponent AI chose:", bestMove);
+            } else {
+                 // If no preferred move is valid, try any move that isn't reversing or colliding
+                 console.log("Opponent AI stuck, trying any valid non-reverse move");
+                 const allPossibleMoves = ['up', 'down', 'left', 'right'];
+                 const emergencyMoves = allPossibleMoves.filter(move => {
+                     if (move === getOppositeDirection(opponentDirection) && opponentSnake.length > 1) return false;
+                     const [ddx, ddy] = getDirectionDelta(move);
+                     const nextX = head.x + ddx;
+                     const nextY = head.y + ddy;
+                      if (nextX < 0 || nextX >= tileCount || nextY < 0 || nextY >= tileCount) return false;
+                      for (let i = 0; i < opponentSnake.length -1; i++) {
+                         if (opponentSnake[i].x === nextX && opponentSnake[i].y === nextY) return false;
+                      }
+                      return true;
+                 });
+                 if(emergencyMoves.length > 0) {
+                    bestMove = emergencyMoves[Math.floor(Math.random() * emergencyMoves.length)];
+                    console.log("Opponent AI emergency move:", bestMove)
+                 } else {
+                     // Truly stuck, keep going straight (will likely hit wall next turn)
+                     console.log("Opponent AI truly stuck, continuing straight.");
+                     bestMove = opponentDirection;
+                 }
+            }
+
+            opponentDirection = bestMove;
+        }
+
+
+        // --- Drawing ---
+        function drawGame() {
+            // Clear canvas (draw background)
+            ctx.fillStyle = '#ecf0f1'; // Light background
+            ctx.fillRect(0, 0, canvasSize, canvasSize);
+
+            // Draw Food
+            drawRect(food.x, food.y, '#e74c3c'); // Red food
+
+            // Draw Player Snake
+            drawSnake(playerSnake, '#2ecc71', '#27ae60'); // Green player
+
+            // Draw Opponent Snake
+            drawSnake(opponentSnake, '#f1c40f', '#f39c12'); // Yellow opponent
+        }
+
+        function drawSnake(snake, fillColor, strokeColor) {
+            snake.forEach((segment, index) => {
+                drawRect(segment.x, segment.y, fillColor, strokeColor, index === 0); // Highlight head slightly
+            });
+        }
+
+        function drawRect(gridX, gridY, fillColor, strokeColor = '#1a1a1a', isHead = false) {
+            ctx.fillStyle = fillColor;
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = 1;
+
+            const x = gridX * gridSize;
+            const y = gridY * gridSize;
+
+            ctx.fillRect(x, y, gridSize, gridSize);
+            ctx.strokeRect(x, y, gridSize, gridSize);
+
+             if(isHead) { // Add a little eye or dot to the head
+                ctx.fillStyle = '#333';
+                ctx.fillRect(x + gridSize * 0.35, y + gridSize * 0.35, gridSize * 0.3, gridSize * 0.3);
+             }
+        }
+
+        function updateLengthBar(barType, score) {
+            const fillElement = (barType === 'player') ? playerBarFill : opponentBarFill;
+            const labelElement = (barType === 'player') ? playerBarLabel : opponentBarLabel;
+            const percentage = Math.min(100, (score / targetScore) * 100); // Cap at 100% visually
+
+            fillElement.style.width = `${percentage}%`;
+            labelElement.textContent = `${(barType === 'player' ? 'You' : 'Opponent')}: ${score}/${targetScore}`;
+        }
+
+
+        // --- Win/Loss Condition ---
+        function checkWinCondition(snakeType) {
+             if (snakeType === 'player' && playerScore >= targetScore) {
+                 console.log("Player reached target score!");
+                 gameOver(true); // Player wins this round
+             } else if (snakeType === 'opponent' && opponentScore >= targetScore) {
+                 console.log("Opponent reached target score!");
+                 gameOver(false); // Player loses
+             }
+        }
+
+        function gameOver(playerWon) {
+            console.log("Game Over. Player Won:", playerWon);
+            isGameOver = true;
+            clearTimeout(gameLoopTimeout);
+            clearTimeout(opponentLoopTimeout);
+
+            if (playerWon) {
+                showOverlay('winScreen');
+                // Increase opponent speed for the *next* round
+                currentOpponentSpeed = Math.max(50, currentOpponentSpeed * 0.90); // Increase speed by 10% (decrease interval), minimum 50ms
+                console.log("Increasing opponent speed for next round to:", currentOpponentSpeed);
+                // Automatically restart after a short delay
+                setTimeout(() => {
+                    initGame(false); // Don't reset speed increase
+                }, 3000); // 3 second delay before restarting
+            } else {
+                showOverlay('loseScreen');
+            }
+        }
+
+         function showOverlay(overlayId) {
+             // Hide any other overlays first
+             hideOverlays();
+             const overlay = document.getElementById(overlayId);
+             if (overlay) {
+                 overlay.style.display = 'flex'; // Use flex to center content
+             }
+         }
+
+         function hideOverlays() {
+             winScreen.style.display = 'none';
+             loseScreen.style.display = 'none';
+         }
+
+        // --- Event Listeners ---
+        document.addEventListener('keydown', handleKeyDown);
+        restartButton.addEventListener('click', () => {
+            console.log("Restart button clicked");
+            initGame(true); // Reset opponent speed on manual restart
+        });
+
+        function handleKeyDown(event) {
+             // Prevent changing direction if game is over or paused
+             if (isGameOver) return;
+
+             // Use nextPlayerDirection to buffer input, preventing rapid back-and-forth issues
+            let intendedDirection = nextPlayerDirection; // Start with the current buffered direction
+
+             switch (event.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    if (playerDirection !== 'down') intendedDirection = 'up';
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    if (playerDirection !== 'up') intendedDirection = 'down';
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    if (playerDirection !== 'right') intendedDirection = 'left';
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    if (playerDirection !== 'left') intendedDirection = 'right';
+                    break;
+            }
+            nextPlayerDirection = intendedDirection; // Update the buffered direction
+        }
+
+        // --- Start the Game ---
+        initGame(); // Initial game start
+
+    </script>
+
+</body>
+</html>

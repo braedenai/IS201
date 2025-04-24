@@ -1,0 +1,137 @@
+/* Global Styles */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  color: #1a1a1a;
+  /* Updated path for background image relative to scratchstyle.css */
+  background: url('../assets/img/mountains.jpg') no-repeat center center fixed;
+
+  background-size: cover;
+  line-height: 1.6;
+}
+
+a {
+  color: #0056b3;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* Section Containers */
+.section {
+  max-width: 800px;
+  margin: 4rem auto;
+  padding: 2rem;
+  background-color: rgba(255, 255, 255, 0.85);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Intro Blurb Styling */
+#intro-blurb h1 {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  color: #003366;
+}
+#intro-blurb p {
+  margin-bottom: 0.75rem;
+}
+
+/* AI Companies List Styling */
+#ai-companies h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: #003366;
+}
+#ai-companies ol {
+  padding-left: 1.25rem;
+}
+#ai-companies li {
+  margin-bottom: 1rem;
+}
+#ai-companies ul {
+  padding-left: 1rem;
+  margin-top: 0.5rem;
+}
+
+/* Resources Section */
+#resources h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: #003366;
+}
+#resources ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin-bottom: 1rem;
+}
+.responsive-image {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin-top: 1rem;
+}
+iframe {
+  width: 100%;
+  height: 315px;
+  border: none;
+  margin-top: 1rem;
+}
+
+/* Fun Facts Section */
+#fun-facts h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: #003366;
+}
+#fun-facts ul {
+  list-style-type: square;
+  padding-left: 1.25rem;
+}
+
+/* Back to Top Link */
+#back-to-top {
+  text-align: center;
+  padding: 2rem 0;
+}
+#back-to-top a {
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+/* Center the page title section */
+#page-title {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+#page-title h1 {
+  font-size: 3rem;
+  color: #003366;
+  margin: 0;
+}
+
+/* Tableau Section */
+#tableau-section h2 {
+  font-size: 2rem;
+  color: #003366;
+  text-align: left;
+  margin-bottom: 1rem;
+}
+
+/* Make the viz full-width inside its container */
+#tableau-section .tableauPlaceholder,
+#tableau-section .tableauPlaceholder object {
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100%;
+}
+
+/* Ensure any iframe/script wrapper respects container width */
+#tableau-section iframe {
+  width: 100%;
+  height: auto;
+  min-height: 500px;  /* or whatever min-height keeps it readable */
+}
